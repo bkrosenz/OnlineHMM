@@ -1,0 +1,127 @@
+/**
+ * Document: MaxCompiler State Machine Tutorial (maxcompiler-sm-tutorial.pdf)
+ * Example: 5      Name: Histogram
+ * MaxFile name: HistogramSM
+ * Summary:
+ *     A state-machine that uses a dual-port RAM to generate a histogram of
+ *     the distribution of intensity of a gray-scale image.
+ */
+package histogramsm;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
+import com.maxeler.maxcompiler.v2.statemachine.Latency;
+import com.maxeler.maxcompiler.v2.statemachine.DFEsmDualPortMappedRAM;
+import com.maxeler.maxcompiler.v2.statemachine.DFEsmInput;
+import com.maxeler.maxcompiler.v2.statemachine.DFEsmStateValue;
+import com.maxeler.maxcompiler.v2.statemachine.kernel.KernelStateMachine;
+import com.maxeler.maxcompiler.v2.statemachine.stdlib.Mem.DualPortRAMMode;
+import com.maxeler.maxcompiler.v2.statemachine.types.DFEsmValueType;
+import com.maxeler.maxcompiler.v2.utils.MathUtils;
+
+class HistogramSMStateMachine extends KernelStateMachine {
+	private final int mHistogramSize;
+	private final int mShiftAmount;
+
+	// Types
+	private final DFEsmValueType mAddressType;
+	private final DFEsmValueType mDataType;
+
+	// I/O
+	private final DFEsmInput iImage;
+	private final DFEsmInput iImageSize;
+
+	// State
+	private final DFEsmStateValue sAddressReg;
+	private final DFEsmStateValue sInputValidReg;
+	private final DFEsmStateValue sAddValue;
+	private final DFEsmStateValue sInputCounter;
+	private final DFEsmStateValue sFinished;
+
+	private final DFEsmDualPortMappedRAM sHistogram;
+
+
+	HistogramSMStateMachine(KernelLib owner, int histogramSize, int width) {
+		super(owner);
+
+		mHistogramSize = histogramSize;
+		mShiftAmount = 8 - MathUtils.bitsToAddress(mHistogramSize);
+		int addressWidth = MathUtils.bitsToAddress(mHistogramSize);
+
+		// Types
+		mAddressType = dfeUInt(addressWidth);
+		mDataType = dfeUInt(width);
+
+		// I/O
+		iImage = io.input("inImage", mDataType);
+		iImageSize = io.scalarInput("imageSize", mDataType);
+
+		// State
+		sInputValidReg = state.value(dfeBool(), false);
+		sAddressReg = state.value(mAddressType, 0);
+		sInputCounter = state.value(mDataType, 0);
+		sFinished = state.value(dfeBool(), false);
+		sAddValue = state.value(mDataType, 0);
+
+		sHistogram = mem.ramMappedDualPort(
+			"histogram",
+			mDataType,
+			mHistogramSize,
+			DualPortRAMMode.READ_ONLY,
+			DualPortRAMMode.WRITE_ONLY,
+			Latency.ONE_CYCLE);
+	}
+
+	@Override
+	protected void nextState() {
+		// Store whether the current input is valid
+		sInputValidReg.next <== io.isInputValid();
+
+		// Set off a read from the RAM for the bucket where the current input falls
+		sHistogram.addressA <== (iImage>>mShiftAmount).cast(mAddressType);
+
+		// Store the address that we started the read for
+		sAddressReg.next <== (iImage>>mShiftAmount).cast(mAddressType);
+
+		// By default, we won't write
+		sHistogram.writeEnableB <== false;
+
+		// If the input was valid in the previous cycle
+		IF (sInputValidReg === true)
+		{
+			/*
+			 * Check if the current input is different to the previous input, or
+			 * if we have read all the data.
+			 *
+			 * If so, then we enable the write to the RAM.
+			 */
+			IF (sAddressReg !== (iImage>>mShiftAmount).cast(mAddressType) | sFinished)
+			{
+				sHistogram.writeEnableB <== true;
+				sAddValue.next <== 0;
+			}
+			// Otherwise, we hold the write to the RAM and increment the amount we will add
+			ELSE
+			{
+				sHistogram.writeEnableB <== false;
+				sAddValue.next <== sAddValue+1;
+			}
+		}
+
+		// Always write out the data and address, as this has no effect without the write enable
+		sHistogram.dataInB <== sHistogram.dataOutA+sAddValue+1;
+		sHistogram.addressB <== sAddressReg;
+
+		// Count the amount of data we have read
+		IF (io.isInputValid() === true)
+			sInputCounter.next <== sInputCounter+1;
+
+		// Register the fact that we have read all the data
+		IF (sInputCounter >= iImageSize-1)
+			sFinished.next <== true;
+	}
+
+
+	@Override
+	protected void outputFunction() {
+	}
+}

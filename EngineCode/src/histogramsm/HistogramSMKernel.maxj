@@ -1,0 +1,33 @@
+/**
+ * Document: MaxCompiler State Machine Tutorial (maxcompiler-sm-tutorial.pdf)
+ * Example: 5      Name: Histogram
+ * MaxFile name: HistogramSM
+ * Summary:
+ *     A kernel that creates a state machine and sends the input stream
+ *     to the statemachine.
+ */
+
+package histogramsm;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.SMIO;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+
+class HistogramSMKernel extends Kernel {
+	HistogramSMKernel(KernelParameters parameters, int histogramSize) {
+		super(parameters);
+
+		DFEVar inImage = io.input("inImage", dfeUInt(32));
+
+		SMIO myHistogramSM = addStateMachine(
+			"HistogramSM",
+			new HistogramSMStateMachine(this, histogramSize, 32));
+
+		myHistogramSM.connectInput("inImage", inImage);
+
+		DFEVar result = inImage + 50;
+
+		io.output("outImage", result, result.getType());
+	}
+}

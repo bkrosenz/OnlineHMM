@@ -1,0 +1,51 @@
+/**
+ * Document: MaxCompiler State Machine Tutorial (maxcompiler-sm-tutorial.pdf)
+ * Example: 5      Name: Histogram
+ * MaxFile name: HistogramSM
+ * Summary:
+ *     A custom design that creates a new HistogramSMKernel, adds
+ *     it, and wires up the inputs/outputs. All IO is between the CPU and
+ *     the DFE.
+ */
+package histogramsm;
+
+import com.maxeler.maxcompiler.v2.build.EngineParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceParam;
+import com.maxeler.maxcompiler.v2.managers.standard.Manager;
+import com.maxeler.maxcompiler.v2.managers.standard.Manager.IOType;
+
+class HistogramSMManager {
+
+	// Must be power of 2 and >1
+	private static final int histogramSize = 32;
+
+	public static void main(String[] args) {
+		Manager m = new Manager(new EngineParameters(args));
+
+		Kernel k = new HistogramSMKernel(m.makeKernelParameters(),
+			histogramSize);
+
+		m.setKernel(k);
+
+		m.setIO(IOType.ALL_CPU);
+
+		m.addMaxFileConstant("histogramSize", histogramSize);
+
+		m.createSLiCinterface(interfaceDefault());
+
+		m.build();
+	}
+
+	static EngineInterface interfaceDefault() {
+		EngineInterface ei = new EngineInterface();
+		InterfaceParam size = ei.addParam("imageSize", CPUTypes.UINT32);
+		ei.setScalar("HistogramSMKernel", "HistogramSM.imageSize", size);
+		ei.setTicks("HistogramSMKernel", size);
+		ei.setStream("inImage", CPUTypes.UINT32, size * CPUTypes.UINT32.sizeInBytes());
+		ei.setStream("outImage", CPUTypes.UINT32, size * CPUTypes.UINT32.sizeInBytes());
+		return ei;
+	}
+}

@@ -1,0 +1,186 @@
+/*
+ * Document: MaxCompiler State Machine Tutorial (maxcompiler-sm-tutorial.pdf)
+ * Example: 5
+ * Summary:
+ *     A simple class for loading, saving and modifying images.
+ */
+package histogramsm;
+
+import java.io.BufferedReader;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
+
+public class Image {
+
+	public static double[] toGrayScale(double[] image) {
+		double[] gs_image = new double[image.length];
+		for (int i = 0; i < image.length; i++) {
+			int pixel = (int) (image[i]);
+			int pixel_gs = ((pixel >> 16) & 0xff) * 3 / 10
+				+ ((pixel >> 8) & 0xff) * 59 / 100 + ((pixel) & 0xff) * 11
+				/ 100;
+			gs_image[i] = pixel_gs;
+		}
+		return gs_image;
+	}
+
+	public static double[] toColor(double[] image) {
+		double[] tmp = new double[image.length];
+		for (int i = 0; i < image.length; i++) {
+			int data = (int) image[i];
+			int pixel = ((data << 16) & 0xFF0000) | ((data << 8) & 0xFF00)
+				| data;
+			tmp[i] = pixel;
+		}
+		return tmp;
+	}
+
+	public static double[] load(
+		int height,
+		int width,
+		boolean grayscale,
+		String fn) {
+
+		InputStream in = Image.class.getResourceAsStream(fn);
+
+		if (in == null) {
+			throw new RuntimeException(
+				"Failed to load input image in Image.load(String...), "
+					+ "tried to load image from " + fn);
+		}
+
+		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+
+		try {
+			String line;
+			do {
+				line = reader.readLine(); // Type
+			} while (line.startsWith("#"));
+
+			if (!line.contains("P3"))
+				throw new RuntimeException("Expecting type = P3" + fn);
+
+			do {
+				line = reader.readLine(); // Type
+			} while (line.startsWith("#"));
+
+			String[] words = line.split(" ");
+			if (words.length != 2)
+				throw new RuntimeException("Expecting dimensions" + fn);
+			height = Integer.parseInt(words[0]);
+			width = Integer.parseInt(words[1]);
+
+			do {
+				line = reader.readLine(); // Type
+			} while (line.startsWith("#"));
+
+			int max_intensity = Integer.parseInt(line);
+
+			if (max_intensity > 255)
+				throw new RuntimeException("Expecting intensity < 256");
+
+			double[] data = new double[width * height];
+
+			int pixels_read = 0;
+			int pixel = 0;
+			int curr_component = 0;
+
+			while (pixels_read < width * height) {
+				do {
+					line = reader.readLine();
+					if (line == null)
+						throw new RuntimeException("Unexpected end of file"
+							+ fn);
+				} while (line.startsWith("#"));
+
+				words = line.split(" ");
+				for (String word : words) {
+					switch (curr_component)
+					{
+						case 0:
+							pixel = Integer.parseInt(word);
+							curr_component++;
+							break;
+						case 1:
+							pixel = (pixel << 8)
+								| (Integer.parseInt(word) & 0xFF);
+							curr_component++;
+							break;
+						case 2:
+							pixel = (pixel << 8)
+								| (Integer.parseInt(word) & 0xFF);
+							curr_component = 0;
+							if (grayscale)
+								pixel = ((pixel >> 16) & 0xff) * 3 / 10
+									+ ((pixel >> 8) & 0xff) * 59 / 100
+									+ ((pixel) & 0xff) * 11 / 100;
+							data[pixels_read] = pixel;
+							pixels_read++;
+							break;
+					}
+				}
+			}
+
+			reader.close();
+
+			return data;
+
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static void write(double[] data, boolean grayscale, String... fn) {
+		write(data, "P2", 1024, grayscale, fn);
+	}
+
+	public static void write(
+		double[] data,
+		String type,
+		int width,
+		boolean grayscale,
+		String... fn) {
+		OutputStream out = null;
+
+		for (String string : fn) {
+			try {
+				out = new FileOutputStream(string);
+			} catch (IOException e) {
+				/* Empty */
+			}
+			if (out != null)
+				break;
+		}
+
+		if (out == null) {
+			throw new RuntimeException(
+				"Failed to open file for output in " +
+				"Image.write(List<Double>, String, int, String...), tried to open "
+					+ fn);
+		}
+
+		PrintStream ps = new PrintStream(out);
+
+		ps.println(type);
+		int height = data.length / width; // 1024;
+		ps.println("" + width + " " + height);
+		ps.println("255");
+		for (int i = 0; i < data.length; i++) {
+			if (grayscale) {
+				data[i] = data[i] > 255 ? 255 : data[i];
+				data[i] = data[i] < 0 ? 0 : data[i];
+
+				for (int j = 0; j < 3; j++)
+					ps.println((int) data[i]);
+			} else {
+				ps.println(((int) data[i]) >> 16);
+				ps.println((((int) data[i]) >> 8) & 0xff);
+				ps.println((((int) data[i])) & 0xff);
+			}
+		}
+	}
+}

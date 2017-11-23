@@ -1,0 +1,6 @@
+from sys import argv
+import numpy as np
+
+A = np.genfromtxt(argv[1])      # transition matrix
+B = np.genfromtxt(argv[2])      # emission matrix
+

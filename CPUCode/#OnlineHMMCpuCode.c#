@@ -1,0 +1,149 @@
+/**
+ * Document: MaxCompiler State Machine Tutorial (maxcompiler-sm-tutorial.pdf)
+ * Example: 5      Name: Histogram
+ * MaxFile name: HistogramSM
+ * Summary:
+ *     Stream an image to the DFE and read back a histogram from mapped memory.
+ */
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <MaxSLiCInterface.h>
+#include "Maxfiles.h"
+#include "ppmIO.h"
+
+int nStates = 2;
+int nSymbols = 4;
+float q[nStates] = {1./nStates}; // initial prior
+float a[nStates][nStates] = {1./nStates}; // initial transition prob matrix
+float b[nStates][nSymbols] = {1./nSymbols}; // initial emission prob matrix
+phi[nStates][nStates][nSymbols][nStates] = {0};// suff stats phi[x_{t-1}][x_t][y_T][x_T]
+gamma[nStates][nStates][nSymbols] = {0}; // gamma[x_{T-1}][x_T][y_T]
+float eta_0 = 1.0; // discount factor.
+int n = 0;
+
+void update(
+	int y,
+	float* q,
+	float* a,
+	float* b,
+	float* phi,
+	float* gamma,
+	    )
+  
+{
+  int i,j,k,h,l;
+  for (i=0; i<nStates; ++i)
+    for (j=0; j<nStates; ++j)
+      for (k=0; k<nStates; ++k)
+	for (h=0; h<nStates; ++h){	  
+	  float temp = 0;
+	  for (l=0; l<nStates; ++l){
+	    int match = (int) (y==k);
+	    int g = (int)(i==l) * (int)(j==h);
+	    temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
+	    
+	  }
+	}
+  ++n;
+  eta *= (n-1) / n;
+}
+void HistogramSMCPU(
+	int dataSize,
+	uint32_t* inImage,
+	uint32_t* outImage,
+	uint64_t* ramIn,
+	uint64_t* outHistogram)
+{
+	ramIn = ramIn; /*unused*/
+	for (int i = 0; i < HistogramSM_histogramSize; i++) {
+		outHistogram[i] = 0;
+	}
+
+	for (int i = 0; i < dataSize; i++) {
+		int index = ((int) inImage[i]) >> 3;
+		outHistogram[index]++;
+		outImage[i] = outImage[i];
+	}
+
+	int sum = 0;
+	printf("Expected histogram: ");
+	for (int i = 0; i < HistogramSM_histogramSize; i++) {
+		printf("%ld ", outHistogram[i]);
+		sum += outHistogram[i];
+	}
+	printf("sum = %d\n", sum);
+}
+
+int check(
+	int histogramSize,
+	uint64_t *expectedOut,
+	uint64_t *dataOut)
+{
+	int status = 0;
+
+	int sum = 0;
+	printf("Received histogram: ");
+	for (int i = 0; i < histogramSize; i++) {
+		printf("%ld ", dataOut[i]);
+		sum += dataOut[i];
+	}
+	printf("sum = %d\n", sum);
+
+	for (int i = 0; i < histogramSize; i++) {
+		if (dataOut[i] != expectedOut[i]) {
+			fprintf(stderr, "Error: data @ %d = %ld (expected %ld)\n",
+				i, dataOut[i], expectedOut[i]);
+			status = 1;
+		}
+	}
+
+	return status;
+}
+
+int main()
+{
+	uint32_t *inImage;
+	int width = 0, height = 0;
+
+	int histogramSize = 32;
+
+	if (histogramSize < 2 || !((histogramSize & (histogramSize - 1)) == 0)) {
+		fprintf(stderr, "histogramSize must be a power of two and >1!");
+		return 1;
+	}
+
+	loadImage(
+		"../EngineCode/src/histogramsm/test2.ppm",
+		&inImage,
+		&width,
+		&height,
+		1);
+
+	size_t dataSize = width * height * sizeof(uint32_t);
+
+	// Allocate a buffer for the edge data to go into.
+	uint32_t *outImage = malloc(dataSize);
+	uint64_t *ramIn = malloc(32 * sizeof(uint64_t));
+	uint64_t* outHistogram = malloc(histogramSize * sizeof(uint64_t));
+	for (int i = 0; i < histogramSize; i++)
+		ramIn[i] = 0;
+
+	uint64_t* expectedHistogram = malloc(histogramSize * sizeof(uint64_t));
+	HistogramSMCPU(width * height, inImage, NULL, NULL, expectedHistogram);
+
+	printf("Running DFE.\n");
+	HistogramSM(width * height, inImage, outImage, ramIn, outHistogram);
+
+	writeImage("test_output.ppm", outImage, width, height, 1);
+
+	int status = check(histogramSize, expectedHistogram, outHistogram);
+
+	if (status)
+		printf("Test failed.\n");
+	else
+		printf("Test passed OK!\n");
+
+	return status;
+}

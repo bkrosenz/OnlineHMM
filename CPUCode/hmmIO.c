@@ -10,6 +10,19 @@
 
 #include "ppmIO.h"
 
+void loadMatrix(char *fname, uint32_t **dest, int rows, int cols)
+{
+  FILE *inputMatrix=fopen(fname,"r");
+  *dest = malloc((*cols) * (*rows) * sizeof(int));
+  for(i=0;i<rows;++i){
+    for(j=0;j<cols+1;++j){
+      fscanf(inputMatrix,"%f",&dest[i][j]);
+    }
+  }
+  fclose(inputMatrix);
+  return;
+}
+
 void loadObservations(char *filename, uint32_t **dest, int *length)
 {
 	// hack to make the buffer big enough
@@ -26,7 +39,7 @@ void loadObservations(char *filename, uint32_t **dest, int *length)
 	fscanf(file, "%d %d\n", width, height);
 	fgets(buffer, 200, file); // Max intensity
 
-	*dest = malloc((*width) * (*height) * sizeof(int));
+	*dest = malloc((*length) * sizeof(int));
 	for (int i = 0; i < length; i++) {
 		int got = fscanf(file, "%d", &v);
 		if (got == 0) {
@@ -36,5 +49,7 @@ void loadObservations(char *filename, uint32_t **dest, int *length)
 				i);
 			exit(1);
 		}
+		(*dest)[i] = v;
 	fclose(file);
+	return;
 }

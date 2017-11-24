@@ -101,7 +101,7 @@ int main()
 		   &observations,
 		   &length);
 
-  int i,j,k,h,l,y=0;
+  int y=-1;
     
   for (int n=0; n < length; ++n){
     // *************** update
@@ -186,8 +186,9 @@ int main()
   int check_results = 0;
   int  status = 0;
   if (check_results) {
-    int a_true = load_a("../data/transition.mat");
-    int b_true = load_b("../data/emission.mat");
+    uint32_t * a_true,b_true;
+    loadMatrix("../data/transition.mat", &a_true, &nStates, &nStates);
+    loadMatrix("../data/emission.mat", &b_true, &nStates, &nSymbols);
     //    int status = check(length, a, b, a_true, b_true);
     
     if (status)

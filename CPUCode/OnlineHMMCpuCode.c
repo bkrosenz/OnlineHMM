@@ -13,29 +13,100 @@
 /* #include "Maxfiles.h" */
 #include "hmmIO.h"
 
-int nStates = 2;
-int nSymbols = 4;
-float q[nStates] = {1./nStates}; // initial prior
-float a[nStates][nStates] = {1./nStates}; // initial transition prob matrix
-float b[nStates][nSymbols] = {1./nSymbols}; // initial emission prob matrix
-float phi[nStates][nStates][nSymbols][nStates] = {0};// suff stats phi[x_{t-1}][x_t][y_T][x_T]
-float gamma[nStates][nStates][nSymbols] = {0}; // gamma[x_{T-1}][x_T][y_T]
-float eta_0 = 1.0; // discount factor.
-int n = 0;
+  const int nStates = 2;
+  const int nSymbols = 4;
 
+/* void update( */
+/* 	    int* y, */
+/* 	    float* eta, */
+/* 	    float* q, */
+/* 	    float* a, */
+/* 	    float* b, */
+/* 	    float* phi, */
+/* 	    float* gamma, */
+/* 	    ); */
 
-void update(
-	int y,
-	float* q,
-	float* a,
-	float* b,
-	float* phi,
-	float* gamma,
-	    ) 
+/* void initialize( */
+/* 		float* q, */
+/* 		float* a, */
+/* 		float* b, */
+/* 		float* phi, */
+/* 		float* gamma, */
+/* 		); */
+ 
+int main()
 {
-  
+  float q[nStates];// = { [1 ... nStates-1] = 1./nStates}; // initial prior
+  float a[nStates][nStates];// = {1./nStates}; // initial transition prob matrix
+  float b[nStates][nSymbols];// = {1./nSymbols}; // initial emission prob matrix
+  float phi[nStates][nStates][nSymbols][nStates];// = {0};// suff stats phi[x_{t-1}][x_t][y_T][x_T]
+  float gamma[nStates][nStates][nSymbols];// = {0}; // gamma[x_{T-1}][x_T][y_T]
+  int n = 0;
+
+  int length = 1000;
+  float eta = 1.0;
+
+  /* initialize( */
+  /* 	    (int *)q, */
+  /* 	    (int *)a, */
+  /* 	    (int *)b, */
+  /* 	    (int *)phi, */
+  /* 	    (int *)gamma ); */
   int i,j,k,h,l;
 
+  //initialize phi  
+  for (i=0; i<nStates; ++i){
+    for (j=0; j<nStates; ++j){
+      for (k=0; k<nStates; ++k){
+	for (h=0; h<nStates; ++h)
+	  phi[i][j][k][h] = 0;
+      }
+    }
+  }
+  // TODO: to initialize phi, run alg for 10^ iters just changing phi
+
+  //initialize q
+  for (l=0; l<nStates; ++l)
+    q[l] = 1./nStates;
+
+  // initialize a
+  for (i=0; i<nStates; ++i)
+    for (j=0; j<nStates; ++j)
+      a[i][j] = 1./nStates;
+
+  // initialize b
+  for (j=0; j<nStates; ++j)
+    for (k=0; k<nSymbols; ++k)
+      b[j][k] = 1./nSymbols;
+
+  
+  // normalization const
+  for (int y; y<nSymbols;++y){
+  float gamma_denom = 0.0;
+  for (i=0; i<nStates; ++i)
+    for (j=0; j<nStates; ++j)
+      gamma_denom += a[i][j]*b[j][y]*q[i];
+  
+  
+  //initialize gamma
+  for (i=0; i<nStates; ++i)
+    for (j=0; j<nStates; ++j)
+      gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
+  }
+  
+  uint32_t *observations;
+  
+  loadObservations(
+		   "../data/sim.y.txt",
+		   &observations,
+		   &length);
+
+  int i,j,k,h,l,y=0;
+    
+  for (int n=0; n < length; ++n){
+    // *************** update
+
+      y = observations[n];
   //update phi  
   for (i=0; i<nStates; ++i){
     for (j=0; j<nStates; ++j){
@@ -47,6 +118,7 @@ void update(
 	    int g = (int)(i==l) * (int)(j==h);
 	    temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
 	  }
+	  phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg
 	}
       }
     }
@@ -58,19 +130,22 @@ void update(
     for (j=0; j<nStates; ++j)
       gamma_denom += a[i][j]*b[j][y]*q[i];
   
+  
   //update gamma
   for (i=0; i<nStates; ++i)
     for (j=0; j<nStates; ++j)
       gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
 
   //update q
-  for (l=0; l<nStates; ++l)
-    for (m=0; m<nStates; ++m)
-      q[l] += gamma[l][m][y]*q[l];
+  for (i=0; i<nStates; ++i)
+    for (j=0; j<nStates; ++j)
+      q[i] += gamma[i][j][y]*q[i];
 
+  float b_denom, a_denom;
+  
   // update a
   for (i=0; i<nStates; ++i){
-    float a_denom = 0.0;
+    a_denom = 0.0;
     for (j=0; j<nStates; ++j){
       a[i][j] = 0;
       for (k=0; k<nSymbols; ++k){
@@ -85,7 +160,7 @@ void update(
 
   // update b
   for (j=0; j<nStates; ++j){
-    float b_denom = 0.0;
+    b_denom = 0.0;
     for (k=0; k<nSymbols; ++k){
       b[j][k] = 0.0;
       for (i=0; i<nStates; ++i){
@@ -98,96 +173,27 @@ void update(
       b[j][k] /= b_denom;
   }
 
-  ++n;
-  
-}
+    /* update( observations[n], */
+    /* 	    eta, */
+    /* 	    (int *)q, */
+    /* 	    (int *)a, */
+    /* 	    (int *)b, */
+    /* 	    (int *)phi, */
+    /* 	    (int *)gamma ); */
+      eta *= (n-1) / n;
+  }
 
-void HistogramSMCPU(
-	int dataSize,
-	uint32_t* inImage,
-	uint32_t* outImage,
-	uint64_t* ramIn,
-	uint64_t* outHistogram)
-{
-	ramIn = ramIn; /*unused*/
-	for (int i = 0; i < HistogramSM_histogramSize; i++) {
-		outHistogram[i] = 0;
-	}
-
-	for (int i = 0; i < dataSize; i++) {
-		int index = ((int) inImage[i]) >> 3;
-		outHistogram[index]++;
-		outImage[i] = outImage[i];
-	}
-
-	int sum = 0;
-	printf("Expected histogram: ");
-	for (int i = 0; i < HistogramSM_histogramSize; i++) {
-		printf("%ld ", outHistogram[i]);
-		sum += outHistogram[i];
-	}
-	printf("sum = %d\n", sum);
-}
-
-int check(
-	int histogramSize,
-	uint64_t *expectedOut,
-	uint64_t *dataOut)
-{
-	int status = 0;
-
-	int sum = 0;
-	printf("Received histogram: ");
-	for (int i = 0; i < histogramSize; i++) {
-		printf("%ld ", dataOut[i]);
-		sum += dataOut[i];
-	}
-	printf("sum = %d\n", sum);
-
-	for (int i = 0; i < histogramSize; i++) {
-		if (dataOut[i] != expectedOut[i]) {
-			fprintf(stderr, "Error: data @ %d = %ld (expected %ld)\n",
-				i, dataOut[i], expectedOut[i]);
-			status = 1;
-		}
-	}
-
-	return status;
-}
-
-int main()
-{
-  int N = 1000;
-  float eta = 1.0;
-  
-  eta *= (n-1) / n;
-  
-	uint32_t *observations;
-
-	if (histogramSize < 2 || !((histogramSize & (histogramSize - 1)) == 0)) {
-		fprintf(stderr, "histogramSize must be a power of two and >1!");
-		return 1;
-	}
-
-	loadObservations(
-		"../EngineCode/src/histogramsm/test2.ppm",
-		&observations,
-		&length);
-	
-	uint64_t* expectedHistogram = malloc(histogramSize * sizeof(uint64_t));
-	HistogramSMCPU(width * height, inImage, NULL, NULL, expectedHistogram);
-
-	printf("Running DFE.\n");
-	HistogramSM(width * height, inImage, outImage, ramIn, outHistogram);
-
-	writeImage("test_output.ppm", outImage, width, height, 1);
-
-	int status = check(histogramSize, expectedHistogram, outHistogram);
-
-	if (status)
-		printf("Test failed.\n");
-	else
-		printf("Test passed OK!\n");
-
-	return status;
+  int check_results = 0;
+  int  status = 0;
+  if (check_results) {
+    int a_true = load_a("../data/transition.mat");
+    int b_true = load_b("../data/emission.mat");
+    //    int status = check(length, a, b, a_true, b_true);
+    
+    if (status)
+      printf("Test failed.\n");
+    else
+      printf("Test passed OK!\n");
+  }
+  return status;
 }

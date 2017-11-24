@@ -38,26 +38,3 @@ void loadObservations(char *filename, uint32_t **dest, int *length)
 		}
 	fclose(file);
 }
-
-void writeImage(char *filename, uint32_t *data, int width, int height, int grayscale)
-{
-	FILE *file = fopen(filename, "w");
-
-	fprintf(file, "P3\n");
-	fprintf(file, "%d %d\n", width, height);
-	fprintf(file, "255\n");
-
-	for (int i = 0; i < width * height; i++) {
-		if (grayscale) {
-			data[i] = data[i] > 255 ? 255 : data[i];
-
-			for (int j = 0; j < 3; j++)
-				fprintf(file, "%d\n", (int) data[i]);
-		} else {
-			fprintf(file, "%d\n", ((int) data[i]) >> 16);
-			fprintf(file, "%d\n", (((int) data[i]) >> 8) & 0xff);
-			fprintf(file, "%d\n", (((int) data[i])) & 0xff);
-		}
-	}
-	fclose(file);
-}

@@ -4,6 +4,8 @@
  * Summary:
  *      Headers for functions to load and save images from the file system.
  */
-void loadObservations(char *filename, uint32_t **dest, int *length);
+void loadMatrix(char *fname, uint32_t **dest, const int *rows, const int *cols);
 
-void loadMatrix(char *fname, uint32_t **dest, int *rows, int *cols);
+void loadObservations(char *filename, uint32_t *dest, const int *length);
+
+void printMatrix(uint32_t **mat,const int *rows, const int *cols);

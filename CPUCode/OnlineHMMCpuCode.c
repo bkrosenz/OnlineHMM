@@ -95,8 +95,8 @@ int main()
       for (j=0; j<nStates; ++j)
 	gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
   }
-  
-  uint32_t[length] observations;
+
+  uint32_t * observations = malloc(length * sizeof(uint32_t));
   
   loadObservations(
 		   "../data/sim.y.txt",
@@ -175,16 +175,12 @@ int main()
 	b[j][k] /= b_denom;
     }
 
-    /* update( observations[n], */
-    /* 	    eta, */
-    /* 	    (int *)q, */
-    /* 	    (int *)a, */
-    /* 	    (int *)b, */
-    /* 	    (int *)phi, */
-    /* 	    (int *)gamma ); */
-    eta *= (n-1) / n;
+    eta *= n / (n+1);
   }
 
+  printMatrix(&a, &nStates, &nStates);
+  printMatrix(&b, &nStates, &nSymbols);
+    
   int check_results = 0;
   int  status = 0;
   if (check_results) {

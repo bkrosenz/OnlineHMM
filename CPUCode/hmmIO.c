@@ -10,7 +10,28 @@
 
 #include "ppmIO.h"
 
-void loadMatrix(char *fname, uint32_t **dest, int *rows, int *cols)
+void printMatrix(uint32_t **mat,const int *rows, const int *cols){
+  for(int i=0; i < *rows; ++i)
+    for(int j=0;j < *cols; ++j)
+      printf("%d ",mat[i][j]);
+  printf("\n");
+  return;
+}
+
+void saveMatrix(char *fname, uint32_t **dest, const int *rows, const int *cols)
+{
+  FILE *outputMatrix=fopen(fname,"w");
+  *dest = malloc((*cols) * (*rows) * sizeof(int));
+  for(int i=0; i < *rows; ++i){
+    for(int j=0;j < *cols; ++j){
+      fscanf(outputMatrix,"%d",&dest[i][j]);
+    }
+  }
+  fclose(outputMatrix);
+  return;
+}
+
+void loadMatrix(char *fname, uint32_t **dest, const int *rows, const int *cols)
 {
   FILE *inputMatrix=fopen(fname,"r");
   *dest = malloc((*cols) * (*rows) * sizeof(int));
@@ -23,7 +44,7 @@ void loadMatrix(char *fname, uint32_t **dest, int *rows, int *cols)
   return;
 }
 
-void loadObservations(char *filename, uint32_t *dest, int *length)
+void loadObservations(char *filename, uint32_t *dest, const int *length)
 {
   FILE *file = fopen(filename, "r");
   if (file == NULL)
@@ -32,11 +53,13 @@ void loadObservations(char *filename, uint32_t *dest, int *length)
     }
 
   dest = malloc((*length) * sizeof(int));
-  char buf[256];
-  int i=0;
-  while (EOF != getline(&buf,sizeof(buf), file))
+  char* line = NULL;
+  size_t len = 0;
+  int i = 0;
+  while ( getline(&line, &len, file) != -1)
     {
-      printf("\"%s\"\n", buf);
+      printf("%d %s\n", i, line);
+      dest[i++] = atoi(line);
     }
   /*       exit(1); */
     /*   dest[i] = atoi(buf); */

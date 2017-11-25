@@ -6,4 +6,4 @@
  */
 void loadObservations(char *filename, uint32_t **dest, int *length);
 
-void loadMatrix(char *fname, uint32_t **dest, int rows, int cols);
+void loadMatrix(char *fname, uint32_t **dest, int *rows, int *cols);

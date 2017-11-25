@@ -13,8 +13,8 @@
 /* #include "Maxfiles.h" */
 #include "hmmIO.h"
 
-  const int nStates = 2;
-  const int nSymbols = 4;
+const int nStates = 2;
+const int nSymbols = 4;
 
 /* void update( */
 /* 	    int* y, */
@@ -80,98 +80,100 @@ int main()
       b[j][k] = 1./nSymbols;
 
   
-  // normalization const
+  
   for (int y; y<nSymbols;++y){
-  float gamma_denom = 0.0;
-  for (i=0; i<nStates; ++i)
-    for (j=0; j<nStates; ++j)
-      gamma_denom += a[i][j]*b[j][y]*q[i];
+
+    // normalization const
+    float gamma_denom = 0.0;
+    for (i=0; i<nStates; ++i)
+      for (j=0; j<nStates; ++j)
+	gamma_denom += a[i][j]*b[j][y]*q[i];
   
   
-  //initialize gamma
-  for (i=0; i<nStates; ++i)
-    for (j=0; j<nStates; ++j)
-      gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
+    //initialize gamma
+    for (i=0; i<nStates; ++i)
+      for (j=0; j<nStates; ++j)
+	gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
   }
   
-  uint32_t *observations;
+  uint32_t[length] observations;
   
   loadObservations(
 		   "../data/sim.y.txt",
 		   &observations,
 		   &length);
 
-  int y=-1;
-    
+  int y = -1;
+  
+  /* ****************** main loop *************** */
   for (int n=0; n < length; ++n){
-    // *************** update
-
-      y = observations[n];
-  //update phi  
-  for (i=0; i<nStates; ++i){
-    for (j=0; j<nStates; ++j){
-      for (k=0; k<nStates; ++k){
-	for (h=0; h<nStates; ++h){
-	  float temp = 0;
-	  for (l=0; l<nStates; ++l){
-	    int match = (int) (y==k);
-	    int g = (int)(i==l) * (int)(j==h);
-	    temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
+  
+  y = observations[n];
+    //update phi  
+    for (i=0; i<nStates; ++i){
+      for (j=0; j<nStates; ++j){
+	for (k=0; k<nStates; ++k){
+	  for (h=0; h<nStates; ++h){
+	    float temp = 0;
+	    for (l=0; l<nStates; ++l){
+	      int match = (int) (y==k);
+	      int g = (int)(i==l) * (int)(j==h);
+	      temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
+	    }
+	    phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg
 	  }
-	  phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg
 	}
       }
     }
-  }
 
-  // normalization const
-  float gamma_denom = 0.0;
-  for (i=0; i<nStates; ++i)
-    for (j=0; j<nStates; ++j)
-      gamma_denom += a[i][j]*b[j][y]*q[i];
+    // normalization const
+    float gamma_denom = 0.0;
+    for (i=0; i<nStates; ++i)
+      for (j=0; j<nStates; ++j)
+	gamma_denom += a[i][j]*b[j][y]*q[i];
   
   
-  //update gamma
-  for (i=0; i<nStates; ++i)
-    for (j=0; j<nStates; ++j)
-      gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
+    //update gamma
+    for (i=0; i<nStates; ++i)
+      for (j=0; j<nStates; ++j)
+	gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
 
-  //update q
-  for (i=0; i<nStates; ++i)
-    for (j=0; j<nStates; ++j)
-      q[i] += gamma[i][j][y]*q[i];
+    //update q
+    for (i=0; i<nStates; ++i)
+      for (j=0; j<nStates; ++j)
+	q[i] += gamma[i][j][y]*q[i];
 
-  float b_denom, a_denom;
+    float b_denom, a_denom;
   
-  // update a
-  for (i=0; i<nStates; ++i){
-    a_denom = 0.0;
+    // update a
+    for (i=0; i<nStates; ++i){
+      a_denom = 0.0;
+      for (j=0; j<nStates; ++j){
+	a[i][j] = 0;
+	for (k=0; k<nSymbols; ++k){
+	  for (h=0; h<nStates; ++h)
+	    a[i][j] += phi[i][j][k][h];
+	}
+	a_denom += a[i][j];
+      }
+      for (j=0; j<nStates; ++j)
+	a[i][j] /= a_denom;
+    }
+
+    // update b
     for (j=0; j<nStates; ++j){
-      a[i][j] = 0;
+      b_denom = 0.0;
       for (k=0; k<nSymbols; ++k){
-	for (h=0; h<nStates; ++h)
-	  a[i][j] += phi[i][j][k][h];
+	b[j][k] = 0.0;
+	for (i=0; i<nStates; ++i){
+	  for (h=0; h<nStates; ++h)
+	    b[j][k] += phi[i][j][k][h];
+	}
+	b_denom += b[j][k];
       }
-      a_denom += a[i][j];
+      for (k=0; k<nSymbols; ++k)
+	b[j][k] /= b_denom;
     }
-    for (j=0; j<nStates; ++j)
-      a[i][j] /= a_denom;
-  }
-
-  // update b
-  for (j=0; j<nStates; ++j){
-    b_denom = 0.0;
-    for (k=0; k<nSymbols; ++k){
-      b[j][k] = 0.0;
-      for (i=0; i<nStates; ++i){
-	for (h=0; h<nStates; ++h)
-	  b[j][k] += phi[i][j][k][h];
-      }
-      b_denom += b[j][k];
-    }
-    for (k=0; k<nSymbols; ++k)
-      b[j][k] /= b_denom;
-  }
 
     /* update( observations[n], */
     /* 	    eta, */
@@ -180,13 +182,14 @@ int main()
     /* 	    (int *)b, */
     /* 	    (int *)phi, */
     /* 	    (int *)gamma ); */
-      eta *= (n-1) / n;
+    eta *= (n-1) / n;
   }
 
   int check_results = 0;
   int  status = 0;
   if (check_results) {
-    uint32_t * a_true,b_true;
+    uint32_t * a_true;
+    uint32_t * b_true;
     loadMatrix("../data/transition.mat", &a_true, &nStates, &nStates);
     loadMatrix("../data/emission.mat", &b_true, &nStates, &nSymbols);
     //    int status = check(length, a, b, a_true, b_true);

@@ -15,25 +15,9 @@
 
 const int nStates = 2;
 const int nSymbols = 4;
+const int STEP = 1; // print after STEP iters
+const  int length = 5;
 
-/* void update( */
-/* 	    int* y, */
-/* 	    float* eta, */
-/* 	    float* q, */
-/* 	    float* a, */
-/* 	    float* b, */
-/* 	    float* phi, */
-/* 	    float* gamma, */
-/* 	    ); */
-
-/* void initialize( */
-/* 		float* q, */
-/* 		float* a, */
-/* 		float* b, */
-/* 		float* phi, */
-/* 		float* gamma, */
-/* 		); */
- 
 int main()
 {
   float q[nStates];// = { [1 ... nStates-1] = 1./nStates}; // initial prior
@@ -43,16 +27,10 @@ int main()
   float gamma[nStates][nStates][nSymbols];// = {0}; // gamma[x_{T-1}][x_T][y_T]
   int n = 0;
 
-  int length = 1000;
-  float eta = 1.0;
-
-  /* initialize( */
-  /* 	    (int *)q, */
-  /* 	    (int *)a, */
-  /* 	    (int *)b, */
-  /* 	    (int *)phi, */
-  /* 	    (int *)gamma ); */
-  int i,j,k,h,l;
+  float eta0 = 1.0;
+  float eta = eta0;
+  
+  int i,j,k,h,l,y;
 
   //initialize phi  
   for (i=0; i<nStates; ++i){
@@ -81,7 +59,7 @@ int main()
 
   
   
-  for (int y; y<nSymbols;++y){
+  for (y=0; y<nSymbols;++y){
 
     // normalization const
     float gamma_denom = 0.0;
@@ -96,31 +74,41 @@ int main()
 	gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
   }
 
-  uint32_t * observations = malloc(length * sizeof(uint32_t));
-  
-  loadObservations(
-		   "../data/sim.y.txt",
-		   &observations,
-		   &length);
+  /* uint32_t * observations = malloc(length * sizeof(uint32_t)); */  
+  /* loadObservations( */
+  /* 		   "../data/sim.y.txt", */
+  /* 		   &observations, */
+  /* 		   &length); */
 
-  int y = -1;
   
   /* ****************** main loop *************** */
-  for (int n=0; n < length; ++n){
+  FILE *file = fopen("../data/sim.y.txt", "r");
+
+  //  for (int n=0; n < length; ++n){
   
-  y = observations[n];
+  /* y = observations[n]; */
+  char* line = NULL;
+  size_t len = 0;
+  i = 0;
+  float temp;
+  n = -1;
+  while ( (n<length) && getline(&line, &len, file) != -1)
+    {
+      y = atoi(line);
+      ++n;
     //update phi  
     for (i=0; i<nStates; ++i){
       for (j=0; j<nStates; ++j){
-	for (k=0; k<nStates; ++k){
+	for (k=0; k<nSymbols; ++k){
+	      int match = (y==k);
 	  for (h=0; h<nStates; ++h){
-	    float temp = 0;
+	    temp = 0.0;
 	    for (l=0; l<nStates; ++l){
-	      int match = (int) (y==k);
-	      int g = (int)(i==l) * (int)(j==h);
+	      int g = (i==l) * (j==h);
 	      temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
 	    }
 	    phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg
+	    //	    printf(" %.4f ",phi[i][j][k][h]);
 	  }
 	}
       }
@@ -139,9 +127,13 @@ int main()
 	gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
 
     //update q
-    for (i=0; i<nStates; ++i)
-      for (j=0; j<nStates; ++j)
-	q[i] += gamma[i][j][y]*q[i];
+    for (i=0; i<nStates; ++i){
+      temp = 0.0;
+	for (j=0; j<nStates; ++j){
+	temp += gamma[j][i][y]*q[i];
+	}
+	q[i] = temp;
+    }
 
     float b_denom, a_denom;
   
@@ -175,11 +167,32 @@ int main()
 	b[j][k] /= b_denom;
     }
 
-    eta *= n / (n+1);
-  }
+    eta = eta0 / (n+1);
 
-  printMatrix(&a, &nStates, &nStates);
-  printMatrix(&b, &nStates, &nSymbols);
+    // check a
+      if (0 == n%STEP) {
+	printf("y: %d, n: %d, eta: %.5f\na:\n",y,n,eta);
+      printf("\na:\n");
+      for(int i=0; i < nStates; ++i){
+	for(int j=0;j < nStates; ++j)
+	  printf("%f ",a[i][j]);
+	printf("\n");
+      }
+      printf("\n****\n");
+      printf("\nb:\n");
+      for(int i=0; i < nStates; ++i){
+      for(int j=0;j < nSymbols; ++j)
+	printf("%f ",b[i][j]);
+      printf("\n");
+      }
+      printf("\n****\n");
+    }
+  }
+    
+    fclose(file);
+
+  /* printMatrix(&a, &nStates, &nStates); */
+  /* printMatrix(&b, &nStates, &nSymbols); */
     
   int check_results = 0;
   int  status = 0;
@@ -196,4 +209,4 @@ int main()
       printf("Test passed OK!\n");
   }
   return status;
-}
+  }

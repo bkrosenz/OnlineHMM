@@ -58,7 +58,7 @@ void loadObservations(char *filename, uint32_t *dest, const int *length)
   int i = 0;
   while ( getline(&line, &len, file) != -1)
     {
-      printf("%d %s\n", i, line);
+      //  printf("%d %s\n", i, line);
       dest[i++] = atoi(line);
     }
   /*       exit(1); */

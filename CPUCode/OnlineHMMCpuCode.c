@@ -15,8 +15,8 @@
 
 const int nStates = 2;
 const int nSymbols = 4;
-const int STEP = 1; // print after STEP iters
-const int length = 10;
+const int STEP = 10; // print after STEP iters
+const int length = 5000;
 
 int main()
 {
@@ -28,16 +28,16 @@ int main()
     int n = 0;
 
     float eta0 = 1.0;
-    float eta = eta0;
+    float eta = 0.01;
     float temp;
     int i,j,k,h,l,y;
 
     //initialize phi  
     for (i=0; i<nStates; ++i){
 	for (j=0; j<nStates; ++j){
-	    for (k=0; k<nStates; ++k){
+	    for (k=0; k<nSymbols; ++k){
 		for (h=0; h<nStates; ++h)
-		    phi[i][j][k][h] = 0;
+		    phi[i][j][k][h] = 0.001;
 	    }
 	}
     }
@@ -72,25 +72,26 @@ int main()
 		gamma[i][j][y] = a[i][j]*b[j][y]/gamma_denom;
     }
 
-    for (int s=0; s<1000; ++s){
-	y = s%nSymbols;
-    	for (i=0; i<nStates; ++i){
-	    for (j=0; j<nStates; ++j){
-		for (k=0; k<nSymbols; ++k){
-		    int match = (y==k);
-		    for (h=0; h<nStates; ++h){
-			temp = 0.0;
-			for (l=0; l<nStates; ++l){
-			    int g = (i==l) * (j==h);
-			    temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) );
-			}
-			phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg
+    /* for (int s=0; s<1000; ++s){ */
+    /* 	y = s%nSymbols; */
+    /* 	for (i=0; i<nStates; ++i){ */
+    /* 	    for (j=0; j<nStates; ++j){ */
+    /* 		for (k=0; k<nSymbols; ++k){ */
+    /* 		    int match = (y==k); */
+    /* 		    for (h=0; h<nStates; ++h){ */
+    /* 			temp = 0.0; */
+    /* 			for (l=0; l<nStates; ++l){ */
+    /* 			    int g = (i==l) * (j==h); */
+    /* 			    temp += gamma[l][h][y] * ( phi[i][j][k][l] + eta * ( match*g*q[l] - phi[i][j][k][l] ) ); */
+    /* 			} */
+    /* 			phi[i][j][k][h] = temp; // TODO: currently this greedily updates and uses the new vals for all later iters.  not like original Mongillo alg */
 
-		    }
-		}
-	    }
-	}
-    }
+    /* 		    } */
+    /* 		} */
+    /* 	    } */
+    /* 	} */
+    /* } */
+
     /* ***** end of initialization **** */
 
     /* uint32_t * observations = malloc(length * sizeof(uint32_t)); */  
@@ -149,6 +150,7 @@ int main()
 		}
 	    }
 	}
+	
 	// normalization const
 	float gamma_denom = 0.0;
 	for (i=0; i<nStates; ++i)
@@ -201,9 +203,7 @@ int main()
 	    for (k=0; k<nSymbols; ++k)
 		b[j][k] /= b_denom;
 	}
-
-	eta = eta0 / (n+1);
-
+	/* eta = eta0 / (n+1); */
     }
 
     

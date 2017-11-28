@@ -1,15 +1,35 @@
 from sys import argv
+import argparse, os
 import numpy as np
 
-if len(argv) < 5:
-    print 'usage: generate_data.py <seq len> <trans mat> <em mat> <prior mat> <outfile prefix>'
-    exit(0)
+def generate_argparser():
+    parser = argparse.ArgumentParser(
+        prog="generate_data.py",
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("-n",type=int,
+                        help="number of samples.", default=1000)
+    parser.add_argument("-e", "--emission", type=os.path.abspath,
+                        help="emission matrix file", default='../data/emission.mat')
+    parser.add_argument("-t", "--transition", type=os.path.abspath,
+                        help="transition matrix file", default='../data/transition.mat')
+    parser.add_argument("-p", "--prior", type=os.path.abspath,
+                        help="prior matrix file",  default='../data/prior.mat')
+    parser.add_argument("-o", "--outfile", type=os.path.abspath,
+                        help="output file prefix",  default='../data/sim')
+    return parser
+
+############ main
+arguments = argv[1:]
+parser = generate_argparser()
+args = parser.parse_args(args=arguments)
     
-N = int(argv[1])                # length of sequence
-A = np.genfromtxt(argv[2])      # transition matrix file
-B = np.genfromtxt(argv[3])      # emission matrix file
-q = np.genfromtxt(argv[4])      # priors
-outfile = argv[5]               # output prefix for .x.txt and .y.txt files
+N = args.n                # length of sequence
+A = np.genfromtxt(args.transition)      # transition matrix file
+B = np.genfromtxt(args.emission)      # emission matrix file
+q = np.genfromtxt(args.prior)      # priors
+outfile = args.outfile               # output prefix for .x.txt and .y.txt files
 print A,B,q
 # categorical random variable
 rv_cat = lambda dist: np.argmax(np.random.multinomial(1,dist))

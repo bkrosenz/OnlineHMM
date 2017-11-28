@@ -43,6 +43,5 @@ for i in range(1,N):
     x[i] = rv_cat( A[ x[i-1] ] )
     y[i] = rv_cat( B[ x[i] ] )
 
-print x,y
 np.savetxt(outfile+'.x.txt',x, fmt = '%d')
 np.savetxt(outfile+'.y.txt',y, fmt = '%d')

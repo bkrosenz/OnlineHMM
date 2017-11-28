@@ -2,13 +2,13 @@ from sys import argv
 import argparse, os
 import numpy as np
 
-STEP = 200
-MAX = 50000
+STEP = 10000
+MAX = None # max number of training points to use
 
 def file_reader(fn):
     with open(fn,'r') as f:
         for n,line in enumerate(f):
-            if n>MAX:
+            if MAX and n>MAX:
                 raise StopIteration
             else:
                 yield int(line)
